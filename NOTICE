@@ -1,0 +1,15 @@
+Triage
+Copyright (c) 2026
+
+Code: MIT (see README).
+
+Bundled indicator data in app/src/main/assets/iocs/
+  From the Zero Breach Toolkit (https://github.com/interplains/Zero-Breach-Toolkit),
+  curated selection dedicated to the public domain under CC0 1.0.
+  Values originate from published research by ESET, Cisco Talos, SentinelLabs, Meta,
+  Volexity, Palo Alto Unit 42, Lookout, Amnesty International's Security Lab, the
+  Citizen Lab and the MVT project; see the file headers for citations and per-source
+  notices.
+
+Stalkerware fingerprint list (app/.../stalkerware/Fingerprints.kt) is hand-maintained
+from public product names.

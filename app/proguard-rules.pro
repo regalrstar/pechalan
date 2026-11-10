@@ -1,0 +1,2 @@
+-dontwarn org.bouncycastle.**
+-keepclassmembers class dev.triage.app.model.** { *; }

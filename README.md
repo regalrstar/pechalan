@@ -89,6 +89,15 @@ Unit tests (rules are pure functions, no device needed):
 ./gradlew :app:testDebugUnitTest
 ```
 
+Real-device test build (release packaging, debuggable, no R8):
+
+```bash
+./gradlew :app:assembleDeviceTest
+adb install -r app/build/outputs/apk/deviceTest/app-deviceTest.apk
+```
+
+See [docs/TESTING.md](docs/TESTING.md) before the first phone run.
+
 ## Architecture
 
 ```

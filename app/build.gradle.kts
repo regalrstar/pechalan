@@ -23,10 +23,22 @@ android {
 		release {
 			isMinifyEnabled = true
 			proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+			signingConfig = signingConfigs.getByName("debug")
 		}
 		debug {
 			applicationIdSuffix = ".debug"
 			versionNameSuffix = "-debug"
+		}
+		// Real-device test build: release speed and packaging, but debuggable so
+		// `run-as` and logcat keep working. No R8, to remove a variable.
+		create("deviceTest") {
+			initWith(getByName("release"))
+			applicationIdSuffix = ".devicetest"
+			versionNameSuffix = "-devicetest"
+			isMinifyEnabled = false
+			isDebuggable = true
+			signingConfig = signingConfigs.getByName("debug")
+			matchingFallbacks += listOf("release")
 		}
 	}
 

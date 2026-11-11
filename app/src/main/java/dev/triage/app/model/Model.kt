@@ -186,21 +186,15 @@ data class InstalledApp(
 	val updated: Long,
 ) {
 	val sideloaded: Boolean
-		get() = !system && (
-			installer == null ||
-				(installer != PLAY_STORE &&
-					installer != "com.google.android.packageinstaller" &&
-					installer != "com.android.packageinstaller")
-			)
+		get() = !system && installer !in KNOWN_STORES
+
 	val unknownInstaller: Boolean
 		get() = !system && (installer == null || installer !in KNOWN_INSTALLERS)
 
 	companion object {
 		const val PLAY_STORE = "com.android.vending"
-		val KNOWN_INSTALLERS = setOf(
+		val KNOWN_STORES = setOf(
 			PLAY_STORE,
-			"com.google.android.packageinstaller",
-			"com.android.packageinstaller",
 			"com.samsung.android.galaxyapps",
 			"com.amazon.venezia",
 			"com.huawei.appmarket",
@@ -209,5 +203,6 @@ data class InstalledApp(
 			"com.heytap.market",
 			"com.bbk.appstore",
 		)
+		val KNOWN_INSTALLERS = KNOWN_STORES + setOf("com.google.android.packageinstaller", "com.android.packageinstaller")
 	}
 }

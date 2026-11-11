@@ -8,6 +8,7 @@ import dev.triage.app.model.FixTarget
 import dev.triage.app.model.Impact
 import dev.triage.app.model.Origin
 import dev.triage.app.model.Severity
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -51,7 +52,7 @@ object DeepScan {
 	}
 
 	private fun system(maxSteps: Int) = """
-You are the analysis layer of Triage, a consumer Android security app. The device
+You are the analysis layer of Pecalang, a consumer Android security app. The device
 evidence below was collected read-only; posture rules have already run and are
 shown to the user. Your job is to add what a careful human reviewer would add, not
 to repeat the rules.
@@ -83,12 +84,14 @@ Rules:
 		val client = runCatching { Clients.build(cfg) }.getOrElse {
 			return AiOutcome(emptyList(), meta(cfg, 0, 0, it.message ?: "not configured"), it.message)
 		}
+		val maxSteps = cfg.maxSteps.coerceIn(2, 10)
 		val turns = mutableListOf(
 			Turn("user", buildString {
 				append("Device: Android ").append(e.release).append(", patch ").append(e.securityPatch).append(".\n")
-				if (extraContext.isNotBlank()) append(extraContext).append("\n")
+				if (extraContext.isNotBlank()) append(if (cfg.sharePackageNames) extraContext else Tools.redactPackageNames(extraContext, e)).append("\n")
 				append("Existing rule findings: ")
-				append(ruleTitles.take(12).joinToString("; ").ifBlank { "none" })
+				val titles = ruleTitles.take(12).joinToString("; ").ifBlank { "none" }
+				append(if (cfg.sharePackageNames) titles else Tools.redactPackageNames(titles, e))
 				append("\n\nEvidence overview: ")
 				append(Tools.run("overview", null, e, cfg.sharePackageNames))
 				append("\n\nStart with one probe.")
@@ -100,11 +103,13 @@ Rules:
 		val findings = mutableListOf<Finding>()
 		var note = ""
 
-		for (i in 0 until cfg.maxSteps) {
+		for (i in 0 until maxSteps) {
 			steps = i + 1
 			onStep(steps, "asking the model")
 			val reply = try {
-				client.complete(system(cfg.maxSteps), turns, MAX_TOKENS)
+				client.complete(system(maxSteps), turns, MAX_TOKENS)
+			} catch (err: CancellationException) {
+				throw err
 			} catch (err: Exception) {
 				return AiOutcome(findings, meta(cfg, steps, tokens, err.message ?: "request failed"), err.message)
 			}

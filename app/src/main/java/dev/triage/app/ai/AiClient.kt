@@ -44,8 +44,6 @@ object Clients {
 
 private class HttpModelClient(private val cfg: AiConfig, private val anthropic: Boolean) : ModelClient {
 
-	private val json = Json { ignoreUnknownKeys = true }
-
 	override suspend fun complete(system: String, turns: List<Turn>, maxTokens: Int): Completion =
 		withContext(Dispatchers.IO) {
 			val body = if (anthropic) {
@@ -86,7 +84,7 @@ private class HttpModelClient(private val cfg: AiConfig, private val anthropic: 
 				if (code !in 200..299) {
 					throw AiException("HTTP $code: ${text.take(300).replace(Regex("\\s+"), " ")}")
 				}
-				parse(text)
+				ModelReplies.parse(text, anthropic)
 			} catch (e: AiException) {
 				throw e
 			} catch (e: Exception) {
@@ -105,7 +103,12 @@ private class HttpModelClient(private val cfg: AiConfig, private val anthropic: 
 		}
 	}
 
-	private fun parse(body: String): Completion {
+}
+
+internal object ModelReplies {
+	private val json = Json { ignoreUnknownKeys = true }
+
+	fun parse(body: String, anthropic: Boolean): Completion {
 		val root = json.parseToJsonElement(body).jsonObject
 		val text = if (anthropic) {
 			root["content"]?.let { c ->
@@ -120,7 +123,11 @@ private class HttpModelClient(private val cfg: AiConfig, private val anthropic: 
 					?.jsonPrimitive?.content
 			}.orEmpty()
 		}
-		val tokens = root["usage"]?.jsonObject?.get("total_tokens")?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+		val usage = root["usage"]?.jsonObject
+		val tokens = if (anthropic) {
+			(usage?.get("input_tokens")?.jsonPrimitive?.content?.toIntOrNull() ?: 0) +
+				(usage?.get("output_tokens")?.jsonPrimitive?.content?.toIntOrNull() ?: 0)
+		} else usage?.get("total_tokens")?.jsonPrimitive?.content?.toIntOrNull() ?: 0
 		if (text.isBlank()) throw AiException("The model returned no text")
 		return Completion(text, tokens)
 	}

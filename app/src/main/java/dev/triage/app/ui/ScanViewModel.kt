@@ -69,7 +69,7 @@ class ScanViewModel(app: Application) : AndroidViewModel(app) {
 		viewModelScope.launch(Dispatchers.IO) {
 			runCatching {
 				val dir = File(getApplication<Application>().cacheDir, "exports").apply { mkdirs() }
-				val file = File(dir, "triage-${report.finishedAt}.json")
+				val file = File(dir, "pecalang-${report.finishedAt}.json")
 				file.writeText(Json { prettyPrint = true }.encodeToString(Report.serializer(), report))
 				return@runCatching FileProvider.getUriForFile(
 					getApplication(), "${getApplication<Application>().packageName}.files", file,

@@ -33,7 +33,7 @@ data class AiConfig(
 	val endpoint: String
 		get() = when (provider) {
 			Provider.OPENAI_COMPATIBLE -> baseUrl.trimEnd('/') + "/chat/completions"
-			Provider.ANTHROPIC -> baseUrl.trimEnd('/') + "/v1/messages"
+			Provider.ANTHROPIC -> baseUrl.trimEnd('/').removeSuffix("/v1") + "/v1/messages"
 			Provider.MOCK -> "mock://"
 			Provider.NONE -> ""
 		}

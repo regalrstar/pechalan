@@ -73,5 +73,5 @@ If part 2 is "attackers could…" with no concrete outcome, rewrite it.
 
 ## Naming
 
-Working name: **Triage**. "Check" is the verb, never "scan" in the UI (the API and
+Product name: **Pecalang**. "Check" is the verb, never "scan" in the UI (the API and
 the code say scan; the user sees check). The app is a check-up, not a scanner.

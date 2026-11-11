@@ -1,12 +1,18 @@
-# Triage
+# Pecalang
 
 A check-up for the phone in your hand.
 
-| Report | AI deep scan | Coverage gaps | AI & protection |
-| :---: | :---: | :---: | :---: |
-| ![Report](docs/screenshots/report-clean.png) | ![Deep scan](docs/screenshots/report.png) | ![Gaps](docs/screenshots/gaps.png) | ![Settings](docs/screenshots/ai-settings.png) |
+| Light appearance | Dark appearance | Settings |
+| :---: | :---: | :---: |
+| ![Light report](docs/screenshots/pecalang/light.png) | ![Dark report](docs/screenshots/pecalang/dark.png) | ![Settings](docs/screenshots/pecalang/settings-light.png) |
 
-Triage is a device-owner security app. It reads the phone locally and answers one
+Earlier feature captures: [clean report](docs/screenshots/report-clean.png),
+[AI review](docs/screenshots/report.png), [coverage gaps](docs/screenshots/gaps.png),
+and [AI configuration](docs/screenshots/ai-settings.png).
+
+Interface guidance and Android adaptations: [Design notes](docs/APPLE-DESIGN.md).
+
+Pecalang is a device-owner security app. It reads the phone locally and answers one
 question honestly: **what on this device can reach my messages, my screen, my
 accounts or my network — and what should I do about it?**
 
@@ -117,7 +123,7 @@ Details in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Relation to Artex
 
-Artex is the heavy autonomous pentest system. Triage is the consumer layer in
+Artex is the heavy autonomous pentest system. Pecalang is the consumer layer in
 front of the same idea. The deterministic engine ships on-device; the same
 evidence bundle can later be handed to an Artex task (as an MCP/http tool source)
 for explanation and deep-dive without giving Artex filesystem access to the
@@ -127,7 +133,7 @@ phone.
 
 Working vertical slice: collector → rules → score → detail → deep link, indicator
 matching, gaps reporting, training example, optional AI deep scan, change watching,
-daily re-scan, boot scan, notification, and JSON export. 20 unit tests. Not yet
+daily re-scan, boot scan, notification, and JSON export. 34 unit tests. Not yet
 ship-ready: see the roadmap (permission declarations, Play data-safety form, copy
 review, performance budget, corpus refresh workflow).
 

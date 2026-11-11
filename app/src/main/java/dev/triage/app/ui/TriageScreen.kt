@@ -3,7 +3,7 @@ package dev.triage.app.ui
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.net.Uri
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -24,13 +26,16 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import androidx.compose.material3.Scaffold
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
-import androidx.compose.material.icons.rounded.OpenInNew
+import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.Button
@@ -55,17 +60,25 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.triage.app.data.ScanState
@@ -78,7 +91,7 @@ import dev.triage.app.rules.Engine
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TriageScreen(
+fun PecalangScreen(
 	state: ScanState,
 	onScan: () -> Unit,
 	onExport: (Report) -> Unit,
@@ -91,176 +104,131 @@ fun TriageScreen(
 	val ctx = LocalContext.current
 	var menu by remember { mutableStateOf(false) }
 	var sheet by remember { mutableStateOf<Sheet>(Sheet.None) }
-	var showNotes by remember { mutableStateOf(false) }
-	var showAll by remember { mutableStateOf(false) }
-	var showGaps by remember { mutableStateOf(false) }
-
-	// First open: there is nothing to show yet, so run the first check.
-	LaunchedEffect(state) {
-		if (state is ScanState.Idle) onScan()
-	}
-
+	var showNotes by rememberSaveable { mutableStateOf(false) }
+	var showAll by rememberSaveable { mutableStateOf(false) }
+	var showGaps by rememberSaveable { mutableStateOf(false) }
+	LaunchedEffect(state) { if (state is ScanState.Idle) onScan() }
 	val report = (state as? ScanState.Done)?.report
 
-	Column(
-		Modifier
-			.fillMaxSize()
-			.background(Ink)
-			.statusBarsPadding()
-			.navigationBarsPadding()
-			.verticalScroll(rememberScrollState())
-			.padding(horizontal = 20.dp),
-	) {
-		Row(
-			Modifier.fillMaxWidth().padding(top = 8.dp),
-			verticalAlignment = Alignment.CenterVertically,
-		) {
-			Icon(Icons.Rounded.Shield, null, tint = Accent, modifier = Modifier.size(22.dp))
-			Spacer(Modifier.width(8.dp))
-			Text("TRIAGE", fontWeight = FontWeight.Bold, letterSpacing = 2.sp, color = TextPrimary)
-			Spacer(Modifier.weight(1f))
-			Box {
-				IconButton({ menu = true }) {
-					Icon(Icons.Filled.MoreVert, "Menu", tint = TextDim)
-				}
-				DropdownMenu(menu, { menu = false }) {
-					DropdownMenuItem(
-						text = { Text("Share report (JSON)") },
-						onClick = { menu = false; report?.let(onExport) },
-						enabled = report != null,
-					)
-					DropdownMenuItem({ Text("How scoring works") }, { menu = false; sheet = Sheet.Scoring })
-					DropdownMenuItem({ Text("What this can't see") }, { menu = false; sheet = Sheet.Limits })
-					DropdownMenuItem({ Text("Indicator sources") }, { menu = false; sheet = Sheet.Sources })
-					DropdownMenuItem({ Text("AI & protection") }, { menu = false; onAiSettings() })
-					DropdownMenuItem({ Text("Training example") }, { menu = false; onTraining() })
-					DropdownMenuItem({ Text("Privacy") }, { menu = false; sheet = Sheet.Privacy })
-				}
-			}
-		}
-
-		Text(
-			report?.let { "${it.deviceLabel} · Android ${it.androidRelease} · patch ${it.patchLevel}" }
-				?: "Read-only check of this phone",
-			color = TextDim,
-			style = MaterialTheme.typography.bodySmall,
-		)
-
-		if (report?.training == true) {
-			Spacer(Modifier.height(8.dp))
-			Surface(color = Severity.MEDIUM.color().copy(alpha = 0.18f), shape = RoundedCornerShape(6.dp)) {
-				Text(
-					"TRAINING EXAMPLE — NOT A REAL CHECK",
-					color = Severity.MEDIUM.color(),
-					style = MaterialTheme.typography.labelSmall,
-					fontWeight = FontWeight.Bold,
-					modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-				)
-			}
-		}
-
-		Spacer(Modifier.height(24.dp))
-
-		when (state) {
-			is ScanState.Scanning -> Scanning()
-			is ScanState.Failed -> Failed(state.message, onScan)
-			is ScanState.Done -> {
-				Score(report!!)
-				Spacer(Modifier.height(14.dp))
-				AiBlock(aiState, report, onDeepScan) { f -> sheet = Sheet.Detail(f) }
-				Spacer(Modifier.height(16.dp))
-				val actionable = report.findings.filter { it.severity >= Severity.LOW }
-				val notes = report.findings.filter { it.severity == Severity.INFO }
-				val shown = if (showAll) actionable else actionable.take(4)
-
-				if (actionable.isEmpty()) {
-					Card {
-						Row(verticalAlignment = Alignment.CenterVertically) {
-							Icon(Icons.Rounded.CheckCircle, null, tint = Accent)
-							Spacer(Modifier.width(10.dp))
-							Text("Nothing needs attention", fontWeight = FontWeight.SemiBold)
+	Scaffold(
+		containerColor = Color.Transparent,
+		topBar = {
+			Box(Modifier.fillMaxWidth().statusBarsPadding(), contentAlignment = Alignment.TopCenter) {
+				Row(Modifier.widthIn(max = 660.dp).fillMaxWidth().padding(start = 24.dp, end = 12.dp, top = 12.dp, bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+					Wordmark(Modifier.weight(1f))
+					IconButton(onAiSettings) { Icon(Icons.Outlined.Tune, "Settings", tint = TextDim, modifier = Modifier.size(21.dp)) }
+					Box {
+						IconButton({ menu = true }) { Icon(Icons.Filled.MoreVert, "More options", tint = TextDim, modifier = Modifier.size(21.dp)) }
+						DropdownMenu(menu, { menu = false }) {
+							DropdownMenuItem({ Text("Share report") }, { menu = false; report?.let(onExport) }, enabled = report != null)
+							DropdownMenuItem({ Text("How scoring works") }, { menu = false; sheet = Sheet.Scoring })
+							DropdownMenuItem({ Text("Check limitations") }, { menu = false; sheet = Sheet.Limits })
+							DropdownMenuItem({ Text("Indicator sources") }, { menu = false; sheet = Sheet.Sources })
+							DropdownMenuItem({ Text("Training example") }, { menu = false; onTraining() })
+							DropdownMenuItem({ Text("Privacy") }, { menu = false; sheet = Sheet.Privacy })
 						}
-						Spacer(Modifier.height(6.dp))
-						Text(
-							"The obvious boxes are ticked. Android changes weekly, so keep the daily check running.",
-							color = TextDim, style = MaterialTheme.typography.bodyMedium,
+					}
+				}
+			}
+		},
+		bottomBar = {
+			Box(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp), contentAlignment = Alignment.Center) {
+				GlassPanel(Modifier.widthIn(max = 628.dp).fillMaxWidth()) {
+					Column(Modifier.padding(10.dp)) {
+						PrimaryAction(
+							label = if (state is ScanState.Scanning) "Checking device…" else if (report == null) "Check this phone" else "Run a new check",
+							onClick = onScan, enabled = state !is ScanState.Scanning, busy = state is ScanState.Scanning,
 						)
-					}
-				} else {
-					Text("Fix first", fontWeight = FontWeight.SemiBold, color = TextPrimary)
-					Spacer(Modifier.height(10.dp))
-					shown.forEach { finding -> FindingRow(finding) { sheet = Sheet.Detail(finding) } }
-					if (!showAll && actionable.size > shown.size) {
-						TextButton({ showAll = true }) { Text("Show all ${actionable.size}") }
+						Row(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 2.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+							Icon(Icons.Outlined.Lock, null, Modifier.size(11.dp), tint = TextDim)
+							Spacer(Modifier.width(6.dp))
+							Text("On-device checks. No account required.", color = TextDim, style = MaterialTheme.typography.labelMedium)
+						}
 					}
 				}
-
-				if (notes.isNotEmpty()) {
-					Spacer(Modifier.height(12.dp))
-					TextButton({ showNotes = !showNotes }) {
-						Text(if (showNotes) "Hide notes" else "Notes (${notes.size})")
-					}
-					if (showNotes) notes.forEach { finding -> FindingRow(finding) { sheet = Sheet.Detail(finding) } }
-				}
-
+			}
+		},
+	) { insets ->
+		Box(Modifier.fillMaxSize().padding(insets), contentAlignment = Alignment.TopCenter) {
+			Column(Modifier.widthIn(max = 660.dp).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp)) {
 				Spacer(Modifier.height(12.dp))
-				Text(
-					"${report.checksRun} checks · ${report.findings.size} results" +
-						if (report.collectorErrors.isEmpty()) "" else " · ${report.collectorErrors.size} collector error(s)",
-					color = TextDim, style = MaterialTheme.typography.bodySmall,
-				)
-				if (report.indicatorCount > 0) {
-					Text(
-						"${report.indicatorCount} bundled spyware indicators, as of ${report.indicatorAsOf}",
-						color = TextDim, style = MaterialTheme.typography.bodySmall,
-					)
-				}
-				if (report.collectorErrors.isNotEmpty()) {
-					Text(report.collectorErrors.joinToString(" · "), color = TextDim, style = MaterialTheme.typography.bodySmall)
-				}
+				Eyebrow("Device security")
+				Text("Overview", style = MaterialTheme.typography.headlineLarge, modifier = Modifier.padding(top = 6.dp, bottom = 6.dp).semantics { heading() })
+				Text("Know what needs your attention.", color = TextDim, style = MaterialTheme.typography.bodyMedium)
+				Spacer(Modifier.height(24.dp))
 
-				if (report.gaps.isNotEmpty()) {
-					Spacer(Modifier.height(14.dp))
-					TextButton({ showGaps = !showGaps }) {
-						Text("Could not check (${report.gaps.size})", color = Severity.MEDIUM.color())
-						Icon(
-							if (showGaps) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
-							null, tint = Severity.MEDIUM.color(), modifier = Modifier.size(18.dp),
-						)
+				if (report?.training == true) {
+					Surface(color = Severity.MEDIUM.color().copy(alpha = 0.12f), shape = RoundedCornerShape(8.dp)) {
+						Text("Training example · not a real device check", color = Severity.MEDIUM.color(), style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(12.dp))
 					}
-					if (showGaps) {
-						report.gaps.forEach { gap ->
-							Row(Modifier.padding(vertical = 3.dp)) {
-								Text("—", color = TextDim)
-								Spacer(Modifier.width(8.dp))
-								Text(gap.text, color = TextDim, style = MaterialTheme.typography.bodySmall)
+					Spacer(Modifier.height(12.dp))
+				}
+				when (state) {
+					ScanState.Idle, is ScanState.Scanning -> Scanning()
+					is ScanState.Failed -> Failed(state.message, onScan)
+					is ScanState.Done -> {
+						val result = state.report
+						Score(result) { sheet = Sheet.Scoring }
+						ReportMetrics(result)
+						Spacer(Modifier.height(28.dp))
+						val actionable = result.findings.filter { it.severity >= Severity.LOW }.sortedByDescending { it.severity }
+						val notes = result.findings.filter { it.severity == Severity.INFO }
+						SectionHeading("Review priorities", "${actionable.size} findings")
+						if (actionable.isEmpty()) {
+							Card {
+								Icon(Icons.Outlined.VerifiedUser, null, Modifier.size(24.dp), tint = TextDim)
+								Spacer(Modifier.height(12.dp))
+								Text("No known issues found", style = MaterialTheme.typography.titleMedium)
+								Text("No actionable risks were found. A clean check does not prove this device is free of spyware.", color = TextDim, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 6.dp))
+							}
+						} else {
+							ContentPanel(Modifier.fillMaxWidth()) {
+								Column {
+									val shown = if (showAll) actionable else actionable.take(3)
+									shown.forEachIndexed { index, finding ->
+										if (index > 0) HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = Hairline)
+										FindingRow(finding) { sheet = Sheet.Detail(finding) }
+									}
+									if (actionable.size > 3) {
+										HorizontalDivider(color = Hairline)
+										TextButton({ showAll = !showAll }, Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(if (showAll) "Show fewer findings" else "View all ${actionable.size} findings") }
+									}
+								}
 							}
 						}
+						if (notes.isNotEmpty()) {
+							TextButton({ showNotes = !showNotes }, Modifier.padding(top = 4.dp)) { Text(if (showNotes) "Hide informational notes" else "${notes.size} informational notes") }
+							if (showNotes) ContentPanel(Modifier.fillMaxWidth()) {
+								Column { notes.forEach { finding -> FindingRow(finding) { sheet = Sheet.Detail(finding) } } }
+							}
+						}
+						Spacer(Modifier.height(28.dp))
+						SectionHeading("A closer look")
+						AiBlock(aiState, result, onDeepScan) { sheet = Sheet.Detail(it) }
+						Spacer(Modifier.height(28.dp))
+						SectionHeading("Check coverage", "${result.checksRun} checks")
+						ContentPanel(Modifier.fillMaxWidth()) {
+							Column(Modifier.padding(18.dp)) {
+								Text(if (result.gaps.isEmpty() && result.collectorErrors.isEmpty()) "Available checks completed" else "Some areas could not be checked", style = MaterialTheme.typography.titleMedium)
+								Text("${result.indicatorCount} published indicators · updated ${result.indicatorAsOf.ifBlank { "date unavailable" }}", color = TextDim, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp))
+								if (result.gaps.isNotEmpty()) {
+									TextButton({ showGaps = !showGaps }) {
+										Text(if (showGaps) "Hide coverage gaps" else "Review ${result.gaps.size} coverage gaps")
+										Icon(if (showGaps) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore, null, Modifier.size(18.dp))
+									}
+									if (showGaps) result.gaps.forEach { Text("• ${it.text}", color = TextDim, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 10.dp)) }
+								}
+								if (result.collectorErrors.isNotEmpty()) Text("${result.collectorErrors.size} collection errors: ${result.collectorErrors.joinToString(" · ")}", color = Severity.MEDIUM.color(), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
+							}
+						}
+						Spacer(Modifier.height(24.dp))
+						Eyebrow("This device")
+						Text("${result.deviceLabel}\nAndroid ${result.androidRelease} · Security patch ${result.patchLevel}", color = TextDim, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
 					}
 				}
+				Spacer(Modifier.height(28.dp))
 			}
-			ScanState.Idle -> Unit
 		}
-
-		Spacer(Modifier.height(24.dp))
-		Button(
-			onClick = onScan,
-			enabled = state !is ScanState.Scanning,
-			modifier = Modifier.fillMaxWidth().height(52.dp),
-			shape = RoundedCornerShape(14.dp),
-			colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Ink),
-		) {
-			Icon(Icons.Rounded.Refresh, null, modifier = Modifier.size(18.dp))
-			Spacer(Modifier.width(8.dp))
-			Text(if (report == null) "Check this phone" else "Check again")
-		}
-		Spacer(Modifier.height(10.dp))
-		Text(
-			"Everything is read on the phone. Nothing is uploaded unless you turn on AI.",
-			color = TextDim, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center,
-			modifier = Modifier.fillMaxWidth(),
-		)
-		Spacer(Modifier.height(28.dp))
 	}
 
 	val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -270,11 +238,14 @@ fun TriageScreen(
 			sheetState = sheetState,
 			containerColor = Surface,
 		) {
+			Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.End) {
+				TextButton({ sheet = Sheet.None }) { Text("Done") }
+			}
 			when (val s = sheet) {
-				is Sheet.Detail -> Detail(s.finding, onFix) {
+				is Sheet.Detail -> Detail(s.finding, { finding -> sheet = Sheet.None; onFix(finding) }) {
 					ctx.copy(s.finding)
+					android.widget.Toast.makeText(ctx, "Finding copied", android.widget.Toast.LENGTH_SHORT).show()
 					sheet = Sheet.None
-					onFix(s.finding)
 				}
 				Sheet.Scoring -> StaticSheet(
 					"Scoring",
@@ -286,11 +257,11 @@ fun TriageScreen(
 				)
 				Sheet.Sources -> StaticSheet(
 					"Indicator sources",
-					"Triage bundles the Android-relevant part of the Zero Breach Toolkit corpus (CC0), as of the date shown on the report.\n\nValues come from published research by ESET, Cisco Talos, SentinelLabs, Meta, Volexity, Unit 42, Lookout, Amnesty International's Security Lab, the Citizen Lab and the Mobile Verification Toolkit project. Each entry keeps its source tag. The file header carries the full citations.\n\nMatched artifacts: package name (weakest — a real app's name can be reused), signing certificate (strong), APK file hash (strongest).\n\nNo network is used: the corpus ships inside the app and goes stale between releases. Check the as-of date.",
+					"Pecalang bundles the Android-relevant part of the Zero Breach Toolkit corpus (CC0), as of the date shown on the report.\n\nValues come from published research by ESET, Cisco Talos, SentinelLabs, Meta, Volexity, Unit 42, Lookout, Amnesty International's Security Lab, the Citizen Lab and the Mobile Verification Toolkit project. Each entry keeps its source tag. The file header carries the full citations.\n\nMatched artifacts: package name (weakest — a real app's name can be reused), signing certificate (strong), APK file hash (strongest).\n\nNo network is used: the corpus ships inside the app and goes stale between releases. Check the as-of date.",
 				)
 				Sheet.Privacy -> StaticSheet(
 					"Privacy",
-					"All collection runs locally. The app has no internet permission in this build.\n\nWhat is read: Android build and patch level, lock-screen state, developer flags, installed package names and their granted permissions, accessibility/admin/notification/overlay/usage access lists, VPN and proxy configuration, Wi-Fi security type and installed user certificates.\n\nWhat is not read: contacts, messages, photos, files, accounts, location history, or traffic contents.\n\nThe report stays in app-private storage until you share it yourself.",
+					"All collection runs locally. Optional AI sends the evidence bundle to the provider you configure when you enable it.\n\nWhat is read: Android build and patch level, lock-screen state, developer flags, installed package names and their granted permissions, accessibility/admin/notification/overlay/usage access lists, VPN and proxy configuration, Wi-Fi security type and installed user certificates.\n\nWhat is not read: contacts, messages, photos, files, accounts, location history, or traffic contents.\n\nThe report stays in app-private storage until you share it yourself.",
 				)
 				Sheet.None -> Unit
 			}
@@ -340,18 +311,18 @@ private fun AiBlock(
 	onRun: () -> Unit,
 	onOpen: (Finding) -> Unit,
 ) {
-	Surface(color = Surface, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
-		Column(Modifier.padding(16.dp)) {
+	ContentPanel(modifier = Modifier.fillMaxWidth()) {
+		Column(Modifier.padding(18.dp)) {
 			Row(verticalAlignment = Alignment.CenterVertically) {
-				Icon(Icons.Rounded.AutoAwesome, null, tint = Accent, modifier = Modifier.size(18.dp))
+				Icon(Icons.Outlined.AutoAwesome, null, tint = TextDim, modifier = Modifier.size(18.dp))
 				Spacer(Modifier.width(8.dp))
-				Text("AI deep scan", fontWeight = FontWeight.SemiBold)
+				Text("AI review", fontWeight = FontWeight.SemiBold)
 				Spacer(Modifier.weight(1f))
-				Text("advisory", color = TextDim, style = MaterialTheme.typography.labelSmall)
+				Text("Optional", color = TextDim, style = MaterialTheme.typography.labelSmall)
 			}
 			Spacer(Modifier.height(4.dp))
 			Text(
-				"Your own model looks for what the rules missed. Results never change the score.",
+				"Connect your own model for a second perspective. Advisory results never change your score.",
 				color = TextDim, style = MaterialTheme.typography.bodySmall,
 			)
 
@@ -392,7 +363,7 @@ private fun AiBlock(
 			}
 
 			if (report.aiFindings.isNotEmpty()) {
-				Spacer(Modifier.height(10.dp))
+				HorizontalDivider(Modifier.padding(top = 14.dp), color = Hairline)
 				report.aiFindings.forEach { finding -> FindingRow(finding) { onOpen(finding) } }
 			}
 
@@ -404,104 +375,118 @@ private fun AiBlock(
 			) {
 				Icon(Icons.Rounded.AutoAwesome, null, modifier = Modifier.size(16.dp))
 				Spacer(Modifier.width(6.dp))
-				Text(if (report.aiFindings.isEmpty() && report.aiMeta == null) "Run deep scan" else "Run deep scan again")
+				Text(if (report.aiFindings.isEmpty() && report.aiMeta == null) "Start AI review" else "Review again")
 			}
 		}
 	}
 }
 
 @Composable
-private fun Score(report: Report) {	val color = when {
-		report.score >= 90 -> Accent
+private fun Score(report: Report, onExplain: () -> Unit) {
+	val statusColor = when {
+		report.score >= 90 -> TextPrimary
 		report.score >= 75 -> Severity.MEDIUM.color()
 		report.score >= 55 -> Severity.HIGH.color()
 		else -> Severity.CRITICAL.color()
 	}
-	Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-		Box(contentAlignment = Alignment.Center) {
-			Canvas(Modifier.size(184.dp)) {
-				val stroke = 14.dp.toPx()
-				val inset = stroke / 2
-				val arcSize = Size(size.width - stroke, size.height - stroke)
-				drawArc(
-					color = SurfaceHigh,
-					startAngle = -90f, sweepAngle = 360f, useCenter = false,
-					topLeft = Offset(inset, inset), size = arcSize,
-					style = Stroke(stroke, cap = StrokeCap.Round),
-				)
-				drawArc(
-					color = color,
-					startAngle = -90f, sweepAngle = 360f * (report.score / 100f), useCenter = false,
-					topLeft = Offset(inset, inset), size = arcSize,
-					style = Stroke(stroke, cap = StrokeCap.Round),
-				)
+	val description = if (report.collectorErrors.isNotEmpty()) "Partial check · review coverage" else when {
+		report.score >= 90 -> "No major risks identified"
+		report.score >= 75 -> "A few things to review"
+		else -> "Review recommended"
+	}
+	val track = Hairline
+	val dialColor = TextPrimary
+	val wide = LocalDensity.current.fontScale <= 1.3f && androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 380
+	Surface(
+		onClick = onExplain, shape = RoundedCornerShape(20.dp), color = Surface,
+		border = BorderStroke(1.dp, Hairline), modifier = Modifier.fillMaxWidth(),
+	) {
+		Column(Modifier.background(Brush.linearGradient(listOf(SurfaceHigh.copy(alpha = 0.4f), Color.Transparent))).padding(22.dp)) {
+			Row(verticalAlignment = Alignment.CenterVertically) {
+				Text("Security posture", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+				Icon(Icons.Outlined.Info, "About this score", Modifier.size(17.dp), tint = TextDim)
 			}
-			Column(horizontalAlignment = Alignment.CenterHorizontally) {
-				Text("${report.score}", fontSize = 52.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-				Text(Engine.grade(report.score), color = color, fontWeight = FontWeight.SemiBold)
+			Spacer(Modifier.height(12.dp))
+			Row(Modifier.fillMaxWidth().semantics(mergeDescendants = true) { contentDescription = "Security score ${report.score} out of 100. ${Engine.grade(report.score)}. $description" }, verticalAlignment = Alignment.CenterVertically) {
+				Column(Modifier.weight(1f)) {
+					Row(verticalAlignment = Alignment.Bottom) {
+						Text("${report.score}", style = MaterialTheme.typography.displayLarge)
+						Text("/ 100", color = TextDim, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 8.dp, bottom = 16.dp))
+					}
+				}
+				if (wide) Box(Modifier.padding(start = 12.dp).size(94.dp), contentAlignment = Alignment.Center) {
+					Canvas(Modifier.fillMaxSize()) {
+						val width = 2.5.dp.toPx()
+						val inset = width / 2
+						val arc = Size(size.width - width, size.height - width)
+						repeat(40) { index ->
+							drawArc(if (index < report.score * 0.4f) dialColor else track, -90f + index * 9, 4f, false, Offset(inset, inset), arc, style = Stroke(width, cap = StrokeCap.Round))
+						}
+					}
+					Icon(Icons.Outlined.VerifiedUser, null, Modifier.size(27.dp), tint = TextDim)
+				}
 			}
-		}
-		Spacer(Modifier.height(10.dp))
-		Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-			countChip("${report.criticalCount} critical", Severity.CRITICAL)
-			countChip("${report.highCount} high", Severity.HIGH)
+			Row(Modifier.padding(top = 4.dp, bottom = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+				Box(Modifier.size(5.dp).clip(RoundedCornerShape(3.dp)).background(statusColor))
+				Spacer(Modifier.width(8.dp))
+				Text(description, color = statusColor, style = MaterialTheme.typography.labelMedium)
+			}
+			HorizontalDivider(color = Hairline)
+			Row(Modifier.fillMaxWidth().padding(top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+				Text("${report.highCount + report.criticalCount} high-priority findings", style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f), color = TextDim)
+				Text(java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(java.util.Date(report.finishedAt)), color = TextDim, style = MaterialTheme.typography.labelMedium)
+			}
+			Text(java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(java.util.Date(report.finishedAt)), color = TextDim, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 6.dp))
 		}
 	}
 }
 
 @Composable
-private fun countChip(text: String, sev: Severity) {
-	Surface(color = SurfaceHigh, shape = RoundedCornerShape(8.dp)) {
-		Text(
-			text, color = if (sev == Severity.CRITICAL && text.startsWith("0")) TextDim else sev.color(),
-			style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-		)
+private fun ReportMetrics(report: Report) {
+	Row(Modifier.fillMaxWidth().padding(top = 18.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+		listOf("${report.checksRun}" to "Checks run", "${report.indicatorCount}" to "Indicators", "${report.gaps.size}" to "Coverage gaps").forEachIndexed { index, (value, label) ->
+			if (index > 0) Box(Modifier.width(1.dp).height(38.dp).background(Hairline))
+			Column(Modifier.weight(1f).padding(start = if (index == 0) 0.dp else 8.dp)) {
+				Text(value, style = MaterialTheme.typography.titleLarge)
+				Text(label, color = TextDim, style = MaterialTheme.typography.bodySmall)
+			}
+		}
 	}
 }
 
 @Composable
 private fun FindingRow(finding: Finding, onClick: () -> Unit) {
-	Surface(
-		color = Surface,
-		shape = RoundedCornerShape(14.dp),
-		modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-		onClick = onClick,
-	) {
-		Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-			Box(
-				Modifier.size(width = 4.dp, height = 34.dp)
-					.clip(RoundedCornerShape(2.dp))
-					.background(finding.severity.color()),
-			)
-			Spacer(Modifier.width(12.dp))
-			Column(Modifier.weight(1f)) {
-				Row(verticalAlignment = Alignment.CenterVertically) {
-					if (finding.origin == Origin.AI) {
-						Surface(color = Accent.copy(alpha = 0.16f), shape = RoundedCornerShape(4.dp)) {
-							Text(
-								"AI", color = Accent, style = MaterialTheme.typography.labelSmall,
-								fontWeight = FontWeight.Bold,
-								modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
-							)
-						}
-						Spacer(Modifier.width(6.dp))
-					}
-					Text(finding.title, fontWeight = FontWeight.Medium, color = TextPrimary)
-				}
-				Text(
-					(finding.appLabel ?: finding.impact.label) +
-						" · " + finding.severity.label + " · " + finding.confidence.name.lowercase(),
-					color = TextDim, style = MaterialTheme.typography.bodySmall,
+	Surface(color = Color.Transparent, onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+		Row(Modifier.heightIn(min = 88.dp).padding(horizontal = 16.dp, vertical = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+			Box(Modifier.size(32.dp).background(SurfaceHigh, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
+				Icon(
+					when (finding.impact) {
+						dev.triage.app.model.Impact.INSTALLED_APP -> Icons.Outlined.Apps
+						dev.triage.app.model.Impact.NETWORK -> Icons.Outlined.Wifi
+						dev.triage.app.model.Impact.ACCOUNT -> Icons.Outlined.PersonOutline
+						else -> Icons.Outlined.Security
+					}, null, Modifier.size(17.dp), tint = TextDim,
 				)
 			}
-			Icon(Icons.Rounded.ChevronRight, null, tint = TextDim)
+			Spacer(Modifier.width(12.dp))
+			Column(Modifier.weight(1f)) {
+				if (finding.origin == Origin.AI) Eyebrow("AI advisory", Modifier.padding(bottom = 4.dp))
+				Text(finding.title, style = MaterialTheme.typography.titleSmall)
+				Row(Modifier.padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+					Text(finding.severity.label, color = finding.severity.color(), style = MaterialTheme.typography.labelMedium)
+					Text("  ·  ${confidenceLabel(finding.confidence)}", color = TextDim, style = MaterialTheme.typography.bodySmall)
+				}
+				finding.appLabel?.let { Text(it, color = TextDim, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 3.dp)) }
+			}
+			Spacer(Modifier.width(8.dp))
+			Icon(Icons.Rounded.ChevronRight, null, Modifier.size(18.dp), tint = TextDim)
 		}
 	}
 }
 
 @Composable
 private fun Detail(finding: Finding, onFix: (Finding) -> Unit, onCopy: () -> Unit) {
-	Column(Modifier.padding(horizontal = 20.dp).imePadding()) {
+	Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).imePadding().navigationBarsPadding()) {
 		Row(verticalAlignment = Alignment.CenterVertically) {
 			Surface(color = finding.severity.color().copy(alpha = 0.16f), shape = RoundedCornerShape(6.dp)) {
 				Text(
@@ -526,22 +511,22 @@ private fun Detail(finding: Finding, onFix: (Finding) -> Unit, onCopy: () -> Uni
 			)
 		}
 		Spacer(Modifier.height(10.dp))
-		Text(finding.title, style = MaterialTheme.typography.titleLarge, color = TextPrimary)
+		Text(finding.title, style = MaterialTheme.typography.headlineMedium, color = TextPrimary)
 		Spacer(Modifier.height(6.dp))
 		Text(finding.impact.label, color = TextDim, style = MaterialTheme.typography.bodySmall)
 
 		Spacer(Modifier.height(16.dp))
-		Text("What we saw", fontWeight = FontWeight.SemiBold, color = TextPrimary)
+		Eyebrow("Observation")
 		Spacer(Modifier.height(4.dp))
 		Text(finding.observed, color = TextDim)
 
 		Spacer(Modifier.height(16.dp))
-		Text("Why it matters", fontWeight = FontWeight.SemiBold, color = TextPrimary)
+		Eyebrow("Why it matters")
 		Spacer(Modifier.height(4.dp))
 		Text(finding.why, color = TextDim)
 
 		Spacer(Modifier.height(16.dp))
-		Text("How to fix it", fontWeight = FontWeight.SemiBold, color = Accent)
+		Eyebrow("Recommended action")
 		Spacer(Modifier.height(4.dp))
 		Text(finding.fix, color = TextPrimary)
 
@@ -551,17 +536,9 @@ private fun Detail(finding: Finding, onFix: (Finding) -> Unit, onCopy: () -> Uni
 		}
 
 		Spacer(Modifier.height(20.dp))
-		Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-			Button(
-				onClick = { onFix(finding) },
-				colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Ink),
-				modifier = Modifier.weight(1f),
-			) {
-				Icon(Icons.Rounded.OpenInNew, null, modifier = Modifier.size(16.dp))
-				Spacer(Modifier.width(6.dp))
-				Text("Open settings")
-			}
-			OutlinedButton(onClick = onCopy) { Text("Copy") }
+		Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+			PrimaryAction("Open device settings", { onFix(finding) })
+			OutlinedButton(onClick = onCopy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Copy finding") }
 		}
 		Spacer(Modifier.height(24.dp))
 	}
@@ -569,17 +546,17 @@ private fun Detail(finding: Finding, onFix: (Finding) -> Unit, onCopy: () -> Uni
 
 @Composable
 private fun StaticSheet(title: String, body: String) {
-	Column(Modifier.padding(horizontal = 20.dp).navigationBarsPadding()) {
+	Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).navigationBarsPadding()) {
 		Text(title, style = MaterialTheme.typography.titleLarge)
 		Spacer(Modifier.height(12.dp))
-		Text(body, color = TextDim)
+		SelectionContainer { Text(body, color = TextDim) }
 		Spacer(Modifier.height(28.dp))
 	}
 }
 
 @Composable
 private fun Card(content: @Composable () -> Unit) {
-	Surface(color = Surface, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+	ContentPanel(modifier = Modifier.fillMaxWidth()) {
 		Column(Modifier.padding(16.dp)) { content() }
 	}
 }
@@ -593,7 +570,5 @@ private fun confidenceLabel(c: Confidence) = when (c) {
 private fun Context.copy(f: Finding) {
 	val text = "${f.title}\n\n${f.observed}\n\nWhy: ${f.why}\n\nFix: ${f.fix}"
 	val cm = getSystemService(ClipboardManager::class.java) ?: return
-	cm.setPrimaryClip(ClipData.newPlainText("Triage finding", text))
+	cm.setPrimaryClip(ClipData.newPlainText("Pecalang finding", text))
 }
-
-private fun Uri.unused() = Unit

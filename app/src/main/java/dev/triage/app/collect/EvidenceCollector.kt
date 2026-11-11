@@ -27,7 +27,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.security.KeyStore
-import java.security.MessageDigest
 
 /**
  * Reads the device. Read-only, no root, no network. Every block is independently
@@ -37,8 +36,11 @@ class EvidenceCollector(private val ctx: Context) {
 
 	private val pm: PackageManager = ctx.packageManager
 	private val errors = mutableListOf<String>()
+	private val coverageGaps = mutableListOf<Gap>()
 
 	suspend fun collect(): Evidence = withContext(Dispatchers.IO) {
+		errors.clear()
+		coverageGaps.clear()
 		val apps = runCatching { readApps() }.getOrElse {
 			errors += "app inventory: ${it.javaClass.simpleName}"
 			emptyList()
@@ -73,7 +75,7 @@ class EvidenceCollector(private val ctx: Context) {
 			wifi = wifi(),
 			hotspotOn = hotspot(),
 			collectorErrors = errors.toList(),
-			gaps = hashGaps,
+			gaps = hashGaps + coverageGaps,
 			iocHits = matchIndicators(identities, iocs),
 			indicatorAsOf = iocs.asOf,
 			indicatorCount = iocs.totalCount,
@@ -98,7 +100,10 @@ class EvidenceCollector(private val ctx: Context) {
 				packageName = pi.packageName,
 				label = runCatching { pm.getApplicationLabel(app).toString() }.getOrDefault(pi.packageName),
 				system = system,
-				installer = runCatching { pm.getInstallSourceInfo(pi.packageName).installingPackageName }.getOrNull(),
+				installer = runCatching {
+					if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) pm.getInstallSourceInfo(pi.packageName).installingPackageName
+					else pm.getInstallerPackageName(pi.packageName)
+				}.getOrNull(),
 				targetSdk = app.targetSdkVersion,
 				dangerousPermissions = granted,
 				hasLauncher = pi.packageName in launcher,
@@ -161,7 +166,10 @@ class EvidenceCollector(private val ctx: Context) {
 		cm.allNetworks.mapNotNull { network ->
 			val caps = cm.getNetworkCapabilities(network) ?: return@mapNotNull null
 			if (!caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) return@mapNotNull null
-			pm.getPackagesForUid(caps.ownerUid)?.firstOrNull()
+			val owner = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) caps.ownerUid else -1
+			val pkg = if (owner >= 0) pm.getPackagesForUid(owner)?.firstOrNull() else null
+			if (pkg == null) coverageGaps += Gap("vpn.identity", "A VPN is active, but Android did not expose the app that owns it. Review VPN settings manually.")
+			pkg
 		}
 	}.getOrDefault(emptyList())
 
@@ -186,8 +194,7 @@ class EvidenceCollector(private val ctx: Context) {
 	): Pair<Map<String, Identity>, List<Gap>> {
 		val out = HashMap<String, Identity>()
 		val gaps = mutableListOf<Gap>()
-		var budget = HASH_BUDGET_BYTES
-		val deadline = android.os.SystemClock.elapsedRealtime() + HASH_BUDGET_MS
+		val budget = HashBudget(HASH_BUDGET_BYTES, android.os.SystemClock.elapsedRealtime() + HASH_BUDGET_MS) { android.os.SystemClock.elapsedRealtime() }
 		var unreadable = 0
 		var skipped = 0
 		val now = System.currentTimeMillis()
@@ -195,32 +202,31 @@ class EvidenceCollector(private val ctx: Context) {
 		for (app in apps) {
 			if (app.system) continue
 			val cert = runCatching { certDigests(app.packageName) }.getOrNull()
-			if (cert == null) {
-				unreadable++
-				continue
-			}
+			if (cert == null || (cert.first == null && cert.second == null)) unreadable++
 			val interesting = iocs.byPackageName(app.packageName) != null ||
 				app.sideloaded ||
 				(app.firstInstall > 0 && now - app.firstInstall < RECENT_MS)
 			val files = if (interesting) {
-				if (budget > 0 && android.os.SystemClock.elapsedRealtime() < deadline) {
-					runCatching { hashApks(app.packageName) { budget -= it } }
-						.getOrNull().also { if (it == null) unreadable++ }
-				} else {
+				try {
+					hashApks(app.packageName, budget).also { if (it == null) unreadable++ }
+				} catch (_: HashBudgetExceeded) {
 					skipped++
+					null
+				} catch (_: Exception) {
+					unreadable++
 					null
 				}
 			} else null
 
 			out[app.packageName] = Identity(
-				cert.first, cert.second,
+				cert?.first, cert?.second,
 				files?.first ?: emptyList(), files?.second ?: emptyList(),
 			)
 		}
 
 		if (skipped > 0) gaps += Gap(
 			"ioc.budget",
-			"Fingerprinting stopped at the budget: $skipped app file(s) were not compared by hash. They were still checked by package name and certificate.",
+			"Fingerprinting stopped at the budget: $skipped app file(s) were not compared by hash. Package-name checks still ran, and certificates were compared when readable.",
 		)
 		if (unreadable > 0) gaps += Gap(
 			"ioc.unreadable",
@@ -244,7 +250,7 @@ class EvidenceCollector(private val ctx: Context) {
 	}
 
 	/** SHA-256/SHA-1 of every APK file of one package (base + splits). */
-	private fun hashApks(pkg: String, spend: (Long) -> Unit): Pair<List<String>, List<String>>? {
+	private fun hashApks(pkg: String, budget: HashBudget): Pair<List<String>, List<String>>? {
 		@Suppress("DEPRECATION")
 		val info = pm.getApplicationInfo(pkg, 0)
 		val paths = buildList {
@@ -257,22 +263,11 @@ class EvidenceCollector(private val ctx: Context) {
 		for (path in paths) {
 			val file = File(path)
 			if (!file.canRead()) return null
-			val d256 = MessageDigest.getInstance("SHA-256")
-			val d1 = MessageDigest.getInstance("SHA-1")
-			var total = 0L
-			file.inputStream().buffered(64 * 1024).use { input ->
-				val buf = ByteArray(64 * 1024)
-				while (true) {
-					val n = input.read(buf)
-					if (n <= 0) break
-					d256.update(buf, 0, n)
-					d1.update(buf, 0, n)
-					total += n
-				}
+			val hashes = file.inputStream().buffered(64 * 1024).use { input ->
+				ApkDigests.hash(input, file.length(), budget)
 			}
-			spend(total)
-			sha256 += hex(d256.digest())
-			sha1 += hex(d1.digest())
+			sha256 += hashes.first
+			sha1 += hashes.second
 		}
 		return sha256 to sha1
 	}
@@ -292,7 +287,6 @@ class EvidenceCollector(private val ctx: Context) {
 		return hits.values.toList()
 	}
 
-	private fun hex(b: ByteArray): String = b.joinToString("") { "%02x".format(it) }
 
 	// ---- posture ----
 

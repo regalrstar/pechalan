@@ -60,7 +60,7 @@ class ScanService : Service() {
 
 	private fun buildNotification(text: String) = NotificationCompat.Builder(this, CHANNEL)
 		.setSmallIcon(R.drawable.ic_stat_scan)
-		.setContentTitle("Triage")
+		.setContentTitle(getString(R.string.app_name))
 		.setContentText(text)
 		.setOngoing(true)
 		.setSilent(true)

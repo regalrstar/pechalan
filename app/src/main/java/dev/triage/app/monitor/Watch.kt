@@ -7,12 +7,9 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
-import androidx.core.content.ContextCompat
-import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
-import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
@@ -119,7 +116,7 @@ object Watch {
 	/** Changes worth a notification even without AI. */
 	fun hardSeverity(lines: List<String>): Severity = when {
 		lines.any { it.startsWith("new device admin") || it.startsWith("new accessibility") } -> Severity.HIGH
-		lines.any { it.startsWith("new user CA") || it.contains("scanning disabled") } -> Severity.MEDIUM
+		lines.any { Regex("^\\d+ new user CA certificate").containsMatchIn(it) || it.contains("scanning disabled") || it.startsWith("new notification listener") } -> Severity.MEDIUM
 		else -> Severity.LOW
 	}
 
@@ -154,7 +151,6 @@ object Watch {
 			return
 		}
 		val periodic = PeriodicWorkRequestBuilder<WatchWorker>(15, TimeUnit.MINUTES)
-			.setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
 			.build()
 		wm.enqueueUniquePeriodicWork("watch-periodic", ExistingPeriodicWorkPolicy.UPDATE, periodic)
 	}
@@ -162,7 +158,6 @@ object Watch {
 	fun recheck(ctx: Context) {
 		val req = OneTimeWorkRequestBuilder<WatchWorker>()
 			.setInitialDelay(4, TimeUnit.SECONDS)
-			.setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
 			.build()
 		WorkManager.getInstance(ctx).enqueueUniqueWork("watch-recheck", ExistingWorkPolicy.REPLACE, req)
 	}
@@ -191,7 +186,9 @@ class WatchWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx,
 		if (!Watch.enabled(ctx)) return Result.success()
 
 		val cfg = AiStore(ctx).load()
-		val evidence = runCatching { EvidenceCollector(ctx).collect() }.getOrNull() ?: return Result.success()
+		val evidence = runCatching { EvidenceCollector(ctx).collect() }.getOrNull() ?: return Result.retry()
+		// Never replace a good baseline with an incomplete app inventory.
+		if (evidence.collectorErrors.any { it.startsWith("app inventory:") }) return Result.retry()
 		val old = Watch.loadBaseline(ctx)
 		val new = Baseline.from(evidence)
 		if (old == null) {
@@ -247,7 +244,7 @@ class WatchWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx,
 
 	companion object {
 		fun oneOff(ctx: Context) {
-			ContextCompat.startForegroundService(ctx, Intent(ctx, MainActivity::class.java))
+			Watch.recheck(ctx)
 		}
 	}
 }

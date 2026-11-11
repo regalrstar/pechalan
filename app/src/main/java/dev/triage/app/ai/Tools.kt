@@ -35,11 +35,23 @@ tool: indicator_hits {} -> published-indicator matches
 		"permission_combos" -> combos(e, args, shareNames)
 		"sideloaded_apps" -> apps(e.sideloaded, shareNames)
 		"access_grants" -> grants(e, shareNames)
-		"network_config" -> network(e)
+		"network_config" -> network(e, shareNames)
 		"os_posture" -> posture(e)
 		"app_detail" -> detail(e, args?.get("package")?.jsonPrimitive?.content, shareNames)
 		"indicator_hits" -> indicators(e, shareNames)
 		else -> """{"error":"unknown tool"}"""
+	}
+
+	/** Redact local identities in watch context and rule titles as well as structured tools. */
+	internal fun redactPackageNames(text: String, e: Evidence): String {
+		val apps = e.apps + e.accessibility + e.deviceAdmins + e.notificationListeners + e.overlayApps + e.usageAccess + e.vpns
+		// Removed apps no longer exist in the current inventory, so no local label can be resolved.
+		val withoutRemovedIdentities = text.replace(Regex("(?m)(^app removed: )[^\\r\\n]+"), "$1App")
+		return apps.distinctBy { it.packageName }.sortedByDescending { it.packageName.length }
+			.fold(withoutRemovedIdentities) { redacted, app ->
+				val label = app.label.takeIf { it.isNotBlank() && it != app.packageName } ?: "App"
+				redacted.replace(app.packageName, label)
+			}
 	}
 
 	private fun app(a: InstalledApp, shareNames: Boolean) = buildJsonObject {
@@ -48,10 +60,11 @@ tool: indicator_hits {} -> published-indicator matches
 			put("package", a.packageName)
 			put("label", label)
 		} else {
-			put("label", label)
+			put("label", if (label == a.packageName) "App" else label)
 		}
 		put("system", a.system)
-		put("installer", a.installer ?: "unknown")
+		if (shareNames) put("installer", a.installer ?: "unknown")
+		else put("installerKnown", a.installer != null)
 		put("targetSdk", a.targetSdk)
 		put("perms", buildJsonArray { a.dangerousPermissions.take(20).forEach { add(it.substringAfterLast('.')) } })
 		if (a.firstInstall > 0) put("firstInstallDays", (System.currentTimeMillis() - a.firstInstall) / 86_400_000)
@@ -95,11 +108,11 @@ tool: indicator_hits {} -> published-indicator matches
 		put("usageAccess", buildJsonArray { e.usageAccess.take(15).forEach { add(app(it, shareNames)) } })
 	}.toString()
 
-	private fun network(e: Evidence) = buildJsonObject {
+	private fun network(e: Evidence, shareNames: Boolean) = buildJsonObject {
 		put("wifi", e.wifi?.let { "${it.ssid ?: "unknown"} (${it.security})" } ?: "not connected")
 		put("privateDns", e.privateDns.name)
 		put("proxy", e.proxyHost ?: "none")
-		put("vpn", buildJsonArray { e.vpns.take(10).forEach { add(it.label) } })
+		put("vpn", buildJsonArray { e.vpns.take(10).forEach { add(if (!shareNames && it.label == it.packageName) "VPN app" else it.label) } })
 		put("userCAs", e.userCaCount)
 	}.toString()
 

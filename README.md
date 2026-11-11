@@ -2,9 +2,9 @@
 
 A check-up for the phone in your hand.
 
-| Report | AI deep scan | AI & protection |
-| :---: | :---: | :---: |
-| ![Report](docs/screenshots/report.png) | ![Deep scan](docs/screenshots/report.png) | ![Settings](docs/screenshots/ai-settings.png) |
+| Report | AI deep scan | Coverage gaps | AI & protection |
+| :---: | :---: | :---: | :---: |
+| ![Report](docs/screenshots/report-clean.png) | ![Deep scan](docs/screenshots/report.png) | ![Gaps](docs/screenshots/gaps.png) | ![Settings](docs/screenshots/ai-settings.png) |
 
 Triage is a device-owner security app. It reads the phone locally and answers one
 question honestly: **what on this device can reach my messages, my screen, my

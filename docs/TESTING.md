@@ -51,13 +51,13 @@ adb shell run-as dev.triage.app.devicetest cat files/last-report.json > report.j
 | `INSTALL_FAILED_USER_RESTRICTED` | MIUI install guard | Enable *Install via USB* + *USB debugging (Security settings)*, sign in to Mi account |
 | Install blocked | Samsung Auto Blocker | Settings → Security and privacy → Auto Blocker → off for the test |
 | Accessibility fix opens a different screen | OEM Settings fork | Record the destination; the text instructions must still work |
-| Watch checks never run | Battery optimisation kills WorkManager | Exempt Triage from battery optimisation |
+| Watch checks never run | Battery optimisation kills WorkManager | Exempt Pecalang from battery optimisation |
 | Scan takes > 60 s | Large APK set / slow flash | Expected on first run; report the number, the budget may need tuning |
 | `run-as` denied | OEM disables debuggable app data | Use the in-app share sheet instead |
 
 ## Reset
 
-- Settings → Apps → Triage → Storage → **Clear storage** (drops report, baseline, key).
+- Settings → Apps → Pecalang → Storage → **Clear storage** (drops report, baseline, key).
 - Uninstall removes everything; nothing leaves the device.
 
 ## Do not test yet

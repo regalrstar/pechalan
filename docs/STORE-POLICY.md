@@ -5,10 +5,10 @@ before uploading.
 
 ## `QUERY_ALL_PACKAGES`
 
-Triage qualifies under the "device security / inventory" use case. The declaration
+Pecalang qualifies under the "device security / inventory" use case. The declaration
 must state:
 
-> Triage inventories installed packages to report sideloaded apps, stalkerware
+> Pecalang inventories installed packages to report sideloaded apps, stalkerware
 > fingerprints and dangerous permission combinations. The list never leaves the
 > device unless the user shares the report.
 

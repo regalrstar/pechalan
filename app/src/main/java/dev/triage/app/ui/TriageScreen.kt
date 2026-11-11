@@ -210,7 +210,7 @@ fun PecalangScreen(
 						ContentPanel(Modifier.fillMaxWidth()) {
 							Column(Modifier.padding(18.dp)) {
 								Text(if (result.gaps.isEmpty() && result.collectorErrors.isEmpty()) "Available checks completed" else "Some areas could not be checked", style = MaterialTheme.typography.titleMedium)
-								Text("${result.indicatorCount} published indicators · updated ${result.indicatorAsOf.ifBlank { "date unavailable" }}", color = TextDim, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp))
+								Text("${java.text.NumberFormat.getIntegerInstance().format(result.indicatorCount)} published indicators · updated ${result.indicatorAsOf.ifBlank { "date unavailable" }}", color = TextDim, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp))
 								if (result.gaps.isNotEmpty()) {
 									TextButton({ showGaps = !showGaps }) {
 										Text(if (showGaps) "Hide coverage gaps" else "Review ${result.gaps.size} coverage gaps")
@@ -444,7 +444,7 @@ private fun Score(report: Report, onExplain: () -> Unit) {
 @Composable
 private fun ReportMetrics(report: Report) {
 	Row(Modifier.fillMaxWidth().padding(top = 18.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-		listOf("${report.checksRun}" to "Checks run", "${report.indicatorCount}" to "Indicators", "${report.gaps.size}" to "Coverage gaps").forEachIndexed { index, (value, label) ->
+		listOf("${report.checksRun}" to "Checks run", java.text.NumberFormat.getIntegerInstance().format(report.indicatorCount) to "Indicators", "${report.gaps.size}" to "Coverage gaps").forEachIndexed { index, (value, label) ->
 			if (index > 0) Box(Modifier.width(1.dp).height(38.dp).background(Hairline))
 			Column(Modifier.weight(1f).padding(start = if (index == 0) 0.dp else 8.dp)) {
 				Text(value, style = MaterialTheme.typography.titleLarge)

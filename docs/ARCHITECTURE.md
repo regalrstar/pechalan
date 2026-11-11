@@ -2,7 +2,7 @@
 
 ## Shape
 
-Triage is local-first by construction. There is no backend in v1, which removes
+Pecalang is local-first by construction. There is no backend in v1, which removes
 the two things consumers distrust most: an account and an upload.
 
 ```

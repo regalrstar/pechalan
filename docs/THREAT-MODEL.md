@@ -1,6 +1,6 @@
 # Threat model
 
-Triage exists for one person: the owner of the phone. The model starts from "who
+Pecalang exists for one person: the owner of the phone. The model starts from "who
 can reach this owner's life through this device", not from a corporate estate.
 
 ## Adversaries, in order of consumer relevance
@@ -12,7 +12,7 @@ monitoring product, grants it SMS/accessibility/location, and hides it.
 
 - Signals: known package fingerprints, unknown installer, install recency,
   permission breadth, device-admin/accessibility grants.
-- What Triage can say: "this product is installed, here is who installed it and
+- What Pecalang can say: "this product is installed, here is who installed it and
   when, here is what it can reach".
 - What it cannot say: whether the *account* behind it is still active. That needs
   the product's own console.
@@ -23,7 +23,7 @@ Store or sideloaded apps that ask for everything, show ads, or harvest OTPs.
 
 - Signals: sideload provenance, SMS + screen combination, overlay + accessibility,
   obsolete target SDK, new-and-broad installs.
-- Limitation: a store-reviewed app can still be malicious for a week. Triage
+- Limitation: a store-reviewed app can still be malicious for a week. Pecalang
   reports capability, not reputation.
 
 ### 3. Network interception
@@ -32,7 +32,7 @@ Hostile Wi-Fi, proxy configuration, a corporate/Charles CA, an unfamiliar VPN.
 
 - Signals: open/WEP Wi-Fi, global proxy, user CA count, active VPN, Private DNS
   off.
-- Limitation: Triage reads configuration, not packets. A pinned app is unaffected
+- Limitation: Pecalang reads configuration, not packets. A pinned app is unaffected
   by a proxy; a sloppy one is fully exposed. We can't tell which.
 
 ### 4. Account takeover via OTP
@@ -52,7 +52,7 @@ No lock, USB debugging, unknown sources, developer mode.
 
 ### 6. Targeted spyware (Pegasus-class)
 
-Out of scope for a v1 app-level scan. The honest position: Triage reports the
+Out of scope for a v1 app-level scan. The honest position: Pecalang reports the
 *enablers* (patch age, profiles, config) and later accepts MVT artifacts; it does
 not claim implant detection.
 

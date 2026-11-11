@@ -111,3 +111,12 @@ if you want them back.
 - No background streaming or chat UI.
 - No model-chosen scoring weights.
 - No transcript sync between devices.
+
+## Connection compatibility (0.1.1)
+
+Anthropic requests omit `temperature`, which newer Claude models reject. The
+connection probe and AI review share this transport. Provider failures display
+HTTP status plus the provider's message, with the configured API key redacted.
+Local HTTP regression tests reproduce the reported rejection and verify the
+actual request headers, request body, connection probe and complete review path.
+These tests use a local stub and a fake key; they do not call a paid provider.

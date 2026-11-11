@@ -9,6 +9,8 @@ import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import java.io.BufferedReader
@@ -51,7 +53,7 @@ private class HttpModelClient(private val cfg: AiConfig, private val anthropic: 
 					put("model", cfg.model)
 					put("system", system)
 					put("max_tokens", maxTokens)
-					put("temperature", 0.1)
+					// Sampling overrides are rejected by newer Claude models; use the model default.
 					put("messages", messages(turns))
 				}
 			} else {
@@ -82,7 +84,7 @@ private class HttpModelClient(private val cfg: AiConfig, private val anthropic: 
 				val text = (if (code in 200..299) conn.inputStream else conn.errorStream)
 					?.bufferedReader()?.use(BufferedReader::readText).orEmpty()
 				if (code !in 200..299) {
-					throw AiException("HTTP $code: ${text.take(300).replace(Regex("\\s+"), " ")}")
+					throw AiException(ModelReplies.error(code, text, cfg.key))
 				}
 				ModelReplies.parse(text, anthropic)
 			} catch (e: AiException) {
@@ -107,6 +109,21 @@ private class HttpModelClient(private val cfg: AiConfig, private val anthropic: 
 
 internal object ModelReplies {
 	private val json = Json { ignoreUnknownKeys = true }
+
+	/** Render only the provider's error message; never echo the configured key. */
+	fun error(status: Int, body: String, key: String): String {
+		val root = runCatching { json.parseToJsonElement(body) }.getOrNull()
+		val error = (root as? JsonObject)?.get("error")
+		val detail = when (error) {
+			is JsonObject -> (error["message"] as? JsonPrimitive)?.contentOrNull
+			is JsonPrimitive -> error.contentOrNull
+			else -> null
+		} ?: (root as? JsonObject)?.get("message")?.let { (it as? JsonPrimitive)?.contentOrNull }
+		val message = detail ?: if (root == null) body else "The provider rejected the request."
+		val safe = (if (key.isBlank()) message else message.replace(key, "[redacted]"))
+			.replace(Regex("""\s+"""), " ").trim().take(300)
+		return "HTTP $status: ${safe.ifBlank { "The provider rejected the request." }}"
+	}
 
 	fun parse(body: String, anthropic: Boolean): Completion {
 		val root = json.parseToJsonElement(body).jsonObject
